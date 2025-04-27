@@ -1,5 +1,5 @@
 use bevy::{
-    color::palettes::css::{GREEN, RED},
+    color::palettes::css::{BROWN, GREEN, RED},
     math::vec3,
     prelude::*,
 };
@@ -21,6 +21,19 @@ const CAR_WIDTH: f32 = WINDOW_WIDTH / 12.;
 const DEFAULT_VELOCITY_INCREASE: f32 = WINDOW_HEIGHT;
 const GRAVITY_PULL_FACTOR: f32 = DEFAULT_VELOCITY_INCREASE / 40.;
 
+// constants related rock
+const ROCK_HEIGHT: f32 = CAR_HEIGHT;
+const ROCK_WIDTH: f32 = CAR_WIDTH;
+const ROCK_VELOCITY: f32 = 200.0;
+const ROCKS_SPAWN_POSITION: Vec3 = vec3(
+    (WINDOW_WIDTH - ROCK_WIDTH) / 2.,
+    GROUND_Y + ROCK_HEIGHT / 2.0,
+    0.0,
+);
+
+#[derive(Component)]
+struct Rock;
+
 #[derive(Component)]
 struct Car;
 
@@ -28,7 +41,7 @@ struct Car;
 struct Earth;
 
 #[derive(Component)]
-struct Velocity(f32);
+struct JumpVelocity(f32);
 
 fn setup(
     mut commands: Commands,
@@ -46,16 +59,13 @@ fn setup(
             translation: CAR_DEFAULT_POSITION,
             ..default()
         },
-        Velocity(0.),
+        JumpVelocity(0.),
         Car,
     ));
 
     // spawn earth
     commands.spawn((
-        Mesh2d(meshes.add(Rectangle::new(
-            EARTH_WIDTH,
-            EARTH_HEIGHT,
-        ))),
+        Mesh2d(meshes.add(Rectangle::new(EARTH_WIDTH, EARTH_HEIGHT))),
         MeshMaterial2d(materials.add(ColorMaterial::from_color(GREEN))),
         Transform {
             translation: EARTH_POSITION,
@@ -66,7 +76,7 @@ fn setup(
 }
 
 fn move_car(
-    car_query: Single<(&mut Transform, &mut Velocity), With<Car>>,
+    car_query: Single<(&mut Transform, &mut JumpVelocity), With<Car>>,
     keyboard_inputs: Res<ButtonInput<KeyCode>>,
     timer: Res<Time>,
 ) {
@@ -85,9 +95,37 @@ fn move_car(
     velocity.0 -= GRAVITY_PULL_FACTOR;
 
     car_pos.translation.y += timer.delta_secs() * velocity.0;
-    if car_pos.translation.y < GROUND_Y + CAR_HEIGHT / 2.  {
+    if car_pos.translation.y < GROUND_Y + CAR_HEIGHT / 2. {
         velocity.0 = 0.;
         car_pos.translation.y = GROUND_Y + CAR_HEIGHT / 2.0;
+    }
+}
+
+fn move_rocks(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    rocks_query: Option<Single<(&mut Transform, Entity), With<Rock>>>,
+    timer: Res<Time>,
+) {
+    if let Some(x) = rocks_query {
+        let (mut rock, entity) = x.into_inner();
+        // no need to iterate twice to calculate length
+        rock.translation.x -= ROCK_VELOCITY * timer.delta_secs();
+
+        if rock.translation.x + ROCK_WIDTH / 2. < -(WINDOW_WIDTH / 2.) {
+            commands.entity(entity).despawn();
+        }
+    } else {
+        commands.spawn((
+            Mesh2d(meshes.add(Rectangle::new(ROCK_WIDTH, ROCK_HEIGHT))),
+            MeshMaterial2d(materials.add(ColorMaterial::from_color(BROWN))),
+            Transform {
+                translation: ROCKS_SPAWN_POSITION,
+                ..default()
+            },
+            Rock,
+        ));
     }
 }
 
@@ -102,6 +140,6 @@ fn main() {
             ..default()
         }))
         .add_systems(Startup, setup)
-        .add_systems(Update, move_car)
+        .add_systems(Update, (move_car, move_rocks))
         .run();
 }
