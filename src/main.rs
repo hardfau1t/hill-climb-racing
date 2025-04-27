@@ -1,6 +1,9 @@
 use bevy::{
     color::palettes::css::{BROWN, GREEN, RED},
-    math::vec3,
+    math::{
+        bounding::{Aabb2d, IntersectsVolume},
+        vec3,
+    },
     prelude::*,
 };
 
@@ -129,6 +132,34 @@ fn move_rocks(
     }
 }
 
+fn check_collision(
+    rocks_query: Option<Single<&Transform, With<Rock>>>,
+    car_query: Single<&Transform, With<Car>>,
+    mut exit: EventWriter<AppExit>,
+) {
+    if let Some(rock) = rocks_query {
+        let t = rock.translation.truncate();
+        let rock_box = Aabb2d::new(
+            t,
+            Vec2 {
+                x: ROCK_WIDTH / 2.0,
+                y: ROCK_HEIGHT / 2.0,
+            },
+        );
+        let car_box = Aabb2d::new(
+            car_query.translation.truncate(),
+            Vec2 {
+                x: CAR_WIDTH / 2.0,
+                y: CAR_HEIGHT / 2.0,
+            },
+        );
+        if rock_box.intersects(&car_box) {
+            info!("You are dead, rock: {rock_box:?}, car: {car_box:?}");
+            exit.send(AppExit::Success);
+        }
+    }
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -140,6 +171,6 @@ fn main() {
             ..default()
         }))
         .add_systems(Startup, setup)
-        .add_systems(Update, (move_car, move_rocks))
+        .add_systems(Update, (move_car, move_rocks, check_collision).chain())
         .run();
 }
