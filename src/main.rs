@@ -10,38 +10,46 @@ use bevy::{
 const WINDOW_WIDTH: f32 = 1200.;
 const WINDOW_HEIGHT: f32 = 800.;
 
-const GROUND_Y: f32 = -((WINDOW_HEIGHT / 2.) / 2.);
-const CAR_DEFAULT_POSITION: Vec3 = vec3(
-    -((3.0 * WINDOW_WIDTH) / (4.0 * 2.0) - (CAR_WIDTH / 2.0)),
-    GROUND_Y,
-    0.,
-);
-const EARTH_WIDTH: f32 = WINDOW_WIDTH;
-const EARTH_HEIGHT: f32 = WINDOW_HEIGHT / 2.0 + GROUND_Y;
-const EARTH_POSITION: Vec3 = vec3(0., (-WINDOW_HEIGHT / 2.0) + (EARTH_HEIGHT / 2.0), 0.);
-const CAR_HEIGHT: f32 = WINDOW_HEIGHT / 20.;
-const CAR_WIDTH: f32 = WINDOW_WIDTH / 12.;
 const DEFAULT_VELOCITY_INCREASE: f32 = WINDOW_HEIGHT;
 const GRAVITY_PULL_FACTOR: f32 = DEFAULT_VELOCITY_INCREASE / 40.;
-
-// constants related rock
-const ROCK_HEIGHT: f32 = CAR_HEIGHT;
-const ROCK_WIDTH: f32 = CAR_WIDTH;
-const ROCK_VELOCITY: f32 = 200.0;
-const ROCKS_SPAWN_POSITION: Vec3 = vec3(
-    (WINDOW_WIDTH - ROCK_WIDTH) / 2.,
-    GROUND_Y + ROCK_HEIGHT / 2.0,
-    0.0,
-);
-
-#[derive(Component)]
-struct Rock;
 
 #[derive(Component)]
 struct Car;
 
+impl Car {
+    const CAR_DEFAULT_POSITION: Vec3 = vec3(
+        -((3.0 * WINDOW_WIDTH) / (4.0 * 2.0) - (Car::WIDTH / 2.0)),
+        Earth::GROUND_Y,
+        0.,
+    );
+    const HEIGHT: f32 = WINDOW_HEIGHT / 20.;
+    const WIDTH: f32 = WINDOW_WIDTH / 12.;
+}
+
+#[derive(Component)]
+struct Rock;
+
+impl Rock {
+    // constants related rock
+    const HEIGHT: f32 = Car::HEIGHT;
+    const WIDTH: f32 = Car::WIDTH;
+    const VELOCITY: f32 = 200.0;
+    const SPAWN_POSITION: Vec3 = vec3(
+        (WINDOW_WIDTH + Rock::WIDTH) / 2.,
+        Earth::GROUND_Y + Rock::HEIGHT / 2.0,
+        0.0,
+    );
+}
+
 #[derive(Component)]
 struct Earth;
+
+impl Earth {
+    const GROUND_Y: f32 = -((WINDOW_HEIGHT / 2.) / 2.);
+    const WIDTH: f32 = WINDOW_WIDTH;
+    const HEIGHT: f32 = WINDOW_HEIGHT / 2.0 + Earth::GROUND_Y;
+    const POSITION: Vec3 = vec3(0., (-WINDOW_HEIGHT / 2.0) + (Earth::HEIGHT / 2.0), 0.);
+}
 
 #[derive(Component)]
 struct JumpVelocity(f32);
@@ -56,10 +64,10 @@ fn setup(
 
     // spawn car
     commands.spawn((
-        Mesh2d(meshes.add(Rectangle::new(CAR_WIDTH, CAR_HEIGHT))),
+        Mesh2d(meshes.add(Rectangle::new(Car::WIDTH, Car::HEIGHT))),
         MeshMaterial2d(materials.add(ColorMaterial::from_color(RED))),
         Transform {
-            translation: CAR_DEFAULT_POSITION,
+            translation: Car::CAR_DEFAULT_POSITION,
             ..default()
         },
         JumpVelocity(0.),
@@ -68,10 +76,10 @@ fn setup(
 
     // spawn earth
     commands.spawn((
-        Mesh2d(meshes.add(Rectangle::new(EARTH_WIDTH, EARTH_HEIGHT))),
+        Mesh2d(meshes.add(Rectangle::new(Earth::WIDTH, Earth::HEIGHT))),
         MeshMaterial2d(materials.add(ColorMaterial::from_color(GREEN))),
         Transform {
-            translation: EARTH_POSITION,
+            translation: Earth::POSITION,
             ..default()
         },
         Earth,
@@ -87,7 +95,7 @@ fn move_car(
     for key in keyboard_inputs.get_just_pressed() {
         match key {
             KeyCode::Space => {
-                if car_pos.translation.y == GROUND_Y + CAR_HEIGHT / 2. {
+                if car_pos.translation.y == Earth::GROUND_Y + Car::HEIGHT / 2. {
                     velocity.0 = DEFAULT_VELOCITY_INCREASE
                 }
             }
@@ -98,9 +106,9 @@ fn move_car(
     velocity.0 -= GRAVITY_PULL_FACTOR;
 
     car_pos.translation.y += timer.delta_secs() * velocity.0;
-    if car_pos.translation.y < GROUND_Y + CAR_HEIGHT / 2. {
+    if car_pos.translation.y < Earth::GROUND_Y + Car::HEIGHT / 2. {
         velocity.0 = 0.;
-        car_pos.translation.y = GROUND_Y + CAR_HEIGHT / 2.0;
+        car_pos.translation.y = Earth::GROUND_Y + Car::HEIGHT / 2.0;
     }
 }
 
@@ -114,17 +122,17 @@ fn move_rocks(
     if let Some(x) = rocks_query {
         let (mut rock, entity) = x.into_inner();
         // no need to iterate twice to calculate length
-        rock.translation.x -= ROCK_VELOCITY * timer.delta_secs();
+        rock.translation.x -= Rock::VELOCITY * timer.delta_secs();
 
-        if rock.translation.x + ROCK_WIDTH / 2. < -(WINDOW_WIDTH / 2.) {
+        if rock.translation.x + Rock::WIDTH / 2. < -(WINDOW_WIDTH / 2.) {
             commands.entity(entity).despawn();
         }
     } else {
         commands.spawn((
-            Mesh2d(meshes.add(Rectangle::new(ROCK_WIDTH, ROCK_HEIGHT))),
+            Mesh2d(meshes.add(Rectangle::new(Rock::WIDTH, Rock::HEIGHT))),
             MeshMaterial2d(materials.add(ColorMaterial::from_color(BROWN))),
             Transform {
-                translation: ROCKS_SPAWN_POSITION,
+                translation: Rock::SPAWN_POSITION,
                 ..default()
             },
             Rock,
@@ -142,15 +150,15 @@ fn check_collision(
         let rock_box = Aabb2d::new(
             t,
             Vec2 {
-                x: ROCK_WIDTH / 2.0,
-                y: ROCK_HEIGHT / 2.0,
+                x: Rock::WIDTH / 2.0,
+                y: Rock::HEIGHT / 2.0,
             },
         );
         let car_box = Aabb2d::new(
             car_query.translation.truncate(),
             Vec2 {
-                x: CAR_WIDTH / 2.0,
-                y: CAR_HEIGHT / 2.0,
+                x: Car::WIDTH / 2.0,
+                y: Car::HEIGHT / 2.0,
             },
         );
         if rock_box.intersects(&car_box) {
