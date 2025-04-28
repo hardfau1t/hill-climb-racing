@@ -10,8 +10,8 @@ use bevy::{
 const WINDOW_WIDTH: f32 = 1200.;
 const WINDOW_HEIGHT: f32 = 800.;
 
-const DEFAULT_VELOCITY_INCREASE: f32 = WINDOW_HEIGHT;
-const GRAVITY_PULL_FACTOR: f32 = DEFAULT_VELOCITY_INCREASE / 40.;
+const JUMP_VELOCITY: f32 = WINDOW_HEIGHT;
+const GRAVITY: f32 = -WINDOW_HEIGHT; // 10px/s2
 
 #[derive(Component)]
 struct Car;
@@ -96,14 +96,14 @@ fn move_car(
         match key {
             KeyCode::Space => {
                 if car_pos.translation.y == Earth::GROUND_Y + Car::HEIGHT / 2. {
-                    velocity.0 = DEFAULT_VELOCITY_INCREASE
+                    velocity.0 = JUMP_VELOCITY
                 }
             }
             _ => debug!("ignoring keypress: {key:?}"),
         }
     }
 
-    velocity.0 -= GRAVITY_PULL_FACTOR;
+    velocity.0 += GRAVITY * timer.delta_secs();
 
     car_pos.translation.y += timer.delta_secs() * velocity.0;
     if car_pos.translation.y < Earth::GROUND_Y + Car::HEIGHT / 2. {
