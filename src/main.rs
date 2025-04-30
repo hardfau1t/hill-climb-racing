@@ -207,6 +207,7 @@ fn setup_menu(mut commands: Commands) {
             height: Val::Percent(100.),
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
+            flex_direction: FlexDirection::Column,
             ..default()
         })
         .with_children(|parent| {
@@ -231,7 +232,29 @@ fn setup_menu(mut commands: Commands) {
                         },
                     ));
                 });
-        })
+            // spawn exit button
+            parent
+                .spawn((
+                    Button,
+                    ExitButton,
+                    Node {
+                        width: Val::Percent(PlayButton::WIDTH),
+                        height: Val::Percent(PlayButton::HEIGHT),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("Exit"),
+                        TextFont {
+                            font_size: PlayButton::TEXT_SIZE,
+                            ..default()
+                        },
+                    ));
+                });
+})
         .id();
     commands.insert_resource(MenuButton { buttons })
 }
