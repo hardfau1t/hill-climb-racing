@@ -18,7 +18,14 @@ enum GameState {
     #[default]
     Menu,
     InGame,
-    Pause,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, SubStates)]
+#[source(GameState = GameState::InGame)]
+enum IsPaused {
+    #[default]
+    Running,
+    Paused,
 }
 
 #[derive(Component)]
@@ -112,6 +119,27 @@ fn setup_game(
         },
         Earth,
     ));
+    commands
+        .spawn((
+            Button,
+            PauseButton,
+            Node {
+                width: Val::Percent(PauseButton::WIDTH),
+                height: Val::Percent(PauseButton::HEIGHT),
+                justify_self: JustifySelf::End,
+                align_self: AlignSelf::Start,
+                ..default()
+            },
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("Pause"),
+                TextFont {
+                    font_size: PauseButton::TEXT_SIZE,
+                    ..default()
+                },
+            ));
+        });
 }
 
 fn move_car(
@@ -255,7 +283,7 @@ fn setup_menu(mut commands: Commands) {
                         },
                     ));
                 });
-})
+        })
         .id();
     commands.insert_resource(MenuButton { buttons })
 }
@@ -297,17 +325,154 @@ fn cleanup_menu(mut commands: Commands, menu_data: Res<MenuButton>) {
     commands.entity(menu_data.buttons).despawn_recursive();
 }
 
-fn pause_game() {}
+#[derive(Component)]
+struct PauseButton;
 
-fn handle_pause() {}
+impl PauseButton {
+    const WIDTH: f32 = 10.0;
+    const HEIGHT: f32 = 10.0;
+    const TEXT_SIZE: f32 = 33.0;
+}
 
-fn resume_game() {}
+#[derive(Component)]
+struct PauseToResumeButton;
+
+impl PauseToResumeButton {
+    const WIDTH: f32 = 10.0;
+    const HEIGHT: f32 = 10.0;
+    const TEXT_SIZE: f32 = 33.0;
+}
+#[derive(Component)]
+struct PauseToEndButton;
+
+impl PauseToEndButton {
+    const WIDTH: f32 = 10.0;
+    const HEIGHT: f32 = 10.0;
+    const TEXT_SIZE: f32 = 33.0;
+}
+
+fn pause_to_end_handle(
+    mut next_state: ResMut<NextState<GameState>>,
+    mut interaction_query: Query<
+        &Interaction,
+        (Changed<Interaction>, With<PauseToEndButton>, With<Button>),
+    >,
+) {
+    for interaction in &mut interaction_query {
+        match interaction {
+            Interaction::Pressed => next_state.set(GameState::Menu),
+            Interaction::Hovered => (),
+            Interaction::None => (),
+        }
+    }
+}
+fn pause_to_resume_handle(
+    mut next_state: ResMut<NextState<IsPaused>>,
+    mut interaction_query: Query<
+        &Interaction,
+        (
+            Changed<Interaction>,
+            With<PauseToResumeButton>,
+            With<Button>,
+        ),
+    >,
+) {
+    for interaction in &mut interaction_query {
+        match interaction {
+            Interaction::Pressed => next_state.set(IsPaused::Running),
+            Interaction::Hovered => (),
+            Interaction::None => (),
+        }
+    }
+}
+fn should_i_pause(
+    mut next_state: ResMut<NextState<IsPaused>>,
+    mut interaction_query: Query<
+        &Interaction,
+        (Changed<Interaction>, With<PauseButton>, With<Button>),
+    >,
+) {
+    for interaction in &mut interaction_query {
+        match interaction {
+            Interaction::Pressed => next_state.set(IsPaused::Paused),
+            Interaction::Hovered => (),
+            Interaction::None => (),
+        }
+    }
+}
+
+#[derive(Resource)]
+struct PauseMenu(Entity);
+
+fn setup_pause_menu(mut commands: Commands) {
+    let buttons = commands
+        .spawn(Node {
+            width: Val::Percent(100.),
+            height: Val::Percent(100.),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            flex_direction: FlexDirection::Column,
+            ..default()
+        })
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Button,
+                    PauseToResumeButton,
+                    Node {
+                        width: Val::Percent(PauseToResumeButton::WIDTH),
+                        height: Val::Percent(PauseToResumeButton::HEIGHT),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("Resume"),
+                        TextFont {
+                            font_size: PauseToResumeButton::TEXT_SIZE,
+                            ..default()
+                        },
+                    ));
+                });
+            // spawn exit button
+            parent
+                .spawn((
+                    Button,
+                    PauseToEndButton,
+                    Node {
+                        width: Val::Percent(PauseToEndButton::WIDTH),
+                        height: Val::Percent(PauseToEndButton::HEIGHT),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("End"),
+                        TextFont {
+                            font_size: PauseToEndButton::TEXT_SIZE,
+                            ..default()
+                        },
+                    ));
+                });
+        })
+        .id();
+    commands.insert_resource(PauseMenu(buttons))
+}
+
+fn resume_game(mut commands: Commands, pause_menu_data: Res<PauseMenu>) {
+    commands.entity(pause_menu_data.0).despawn_recursive();
+}
 
 fn end_game(
     mut commands: Commands,
     player: Query<Entity, With<Car>>,
     rock: Query<Entity, With<Rock>>,
     earth: Query<Entity, With<Earth>>,
+    pause_button: Query<Entity, With<PauseButton>>,
 ) {
     for player_entity in player.iter() {
         commands.entity(player_entity).despawn()
@@ -317,6 +482,9 @@ fn end_game(
     }
     for earth_entity in earth.iter() {
         commands.entity(earth_entity).despawn()
+    }
+    for pause_entity in pause_button.iter() {
+        commands.entity(pause_entity).despawn_recursive()
     }
 }
 
@@ -331,6 +499,7 @@ fn main() {
             ..default()
         }))
         .init_state::<GameState>()
+        .add_sub_state::<IsPaused>()
         .add_systems(Startup, setup)
         .add_systems(OnEnter(GameState::Menu), setup_menu)
         .add_systems(
@@ -341,13 +510,16 @@ fn main() {
         .add_systems(OnEnter(GameState::InGame), setup_game)
         .add_systems(
             Update,
-            (move_car, move_rocks, check_collision)
+            (move_car, move_rocks, check_collision, should_i_pause)
                 .chain()
-                .run_if(in_state(GameState::InGame)),
+                .run_if(in_state(IsPaused::Running)),
         )
         .add_systems(OnExit(GameState::InGame), end_game)
-        .add_systems(OnEnter(GameState::Pause), pause_game)
-        .add_systems(Update, handle_pause.run_if(in_state(GameState::Pause)))
-        .add_systems(OnExit(GameState::Pause), resume_game)
+        .add_systems(OnEnter(IsPaused::Paused), setup_pause_menu)
+        .add_systems(
+            Update,
+            (pause_to_end_handle, pause_to_resume_handle).run_if(in_state(IsPaused::Paused)),
+        )
+        .add_systems(OnExit(IsPaused::Paused), resume_game)
         .run();
 }
