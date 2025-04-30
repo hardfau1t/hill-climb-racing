@@ -77,6 +77,7 @@ struct ExitButton;
 impl ExitButton {
     const WIDTH: f32 = 10.0;
     const HEIGHT: f32 = 10.0;
+    const TEXT_SIZE: f32 = 25.0;
 }
 
 fn setup(mut commands: Commands) {
@@ -238,8 +239,8 @@ fn setup_menu(mut commands: Commands) {
                     Button,
                     ExitButton,
                     Node {
-                        width: Val::Percent(PlayButton::WIDTH),
-                        height: Val::Percent(PlayButton::HEIGHT),
+                        width: Val::Percent(ExitButton::WIDTH),
+                        height: Val::Percent(ExitButton::HEIGHT),
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
                         ..default()
@@ -249,7 +250,7 @@ fn setup_menu(mut commands: Commands) {
                     parent.spawn((
                         Text::new("Exit"),
                         TextFont {
-                            font_size: PlayButton::TEXT_SIZE,
+                            font_size: ExitButton::TEXT_SIZE,
                             ..default()
                         },
                     ));
