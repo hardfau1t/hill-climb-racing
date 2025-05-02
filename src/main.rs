@@ -10,8 +10,17 @@ use bevy::{
 const WINDOW_WIDTH: f32 = 1200.;
 const WINDOW_HEIGHT: f32 = 800.;
 
-const JUMP_VELOCITY: f32 = WINDOW_HEIGHT;
-const GRAVITY: f32 = -WINDOW_HEIGHT;
+const MAX_JUMP_VELOCITY: Vec2 = Vec2 {
+    x: 0.,
+    y: WINDOW_HEIGHT,
+};
+
+const FULL_SPEED_JUMP_TIME: f32 = 1.; // number of seconds required to reach full speed
+
+const GRAVITY: Vec2 = Vec2 {
+    x: 0.,
+    y: -WINDOW_HEIGHT,
+};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, States)]
 enum GameState {
@@ -67,7 +76,10 @@ impl Earth {
 }
 
 #[derive(Component)]
-struct JumpVelocity(f32);
+struct Velocity(Vec2);
+
+#[derive(Component)]
+struct PotentialEnergy(Vec2);
 
 #[derive(Component)]
 struct PlayButton;
@@ -105,7 +117,8 @@ fn setup_game(
             translation: Car::CAR_DEFAULT_POSITION,
             ..default()
         },
-        JumpVelocity(0.),
+        Velocity(Vec2::ZERO),
+        PotentialEnergy(Vec2::ZERO),
         Car,
     ));
 
@@ -143,16 +156,28 @@ fn setup_game(
 }
 
 fn move_car(
-    car_query: Single<(&mut Transform, &mut JumpVelocity), With<Car>>,
+    car_query: Single<(&mut Transform, &mut Velocity, &mut PotentialEnergy), With<Car>>,
     keyboard_inputs: Res<ButtonInput<KeyCode>>,
     timer: Res<Time>,
 ) {
-    let (mut car_pos, mut velocity) = car_query.into_inner();
-    for key in keyboard_inputs.get_just_pressed() {
+    let (mut car_pos, mut velocity, mut potential) = car_query.into_inner();
+    for key in keyboard_inputs.get_pressed() {
         match key {
             KeyCode::Space => {
                 if car_pos.translation.y == Earth::GROUND_Y + Car::HEIGHT / 2. {
-                    velocity.0 = JUMP_VELOCITY
+                    potential.0 = (potential.0 + MAX_JUMP_VELOCITY * timer.delta_secs())
+                        .min(MAX_JUMP_VELOCITY);
+                }
+            }
+            _ => debug!("ignoring keypress: {key:?}"),
+        }
+    }
+    for key in keyboard_inputs.get_just_released() {
+        match key {
+            KeyCode::Space => {
+                if car_pos.translation.y == Earth::GROUND_Y + Car::HEIGHT / 2. {
+                    velocity.0 = potential.0;
+                    potential.0 = Vec2::ZERO;
                 }
             }
             _ => debug!("ignoring keypress: {key:?}"),
@@ -161,9 +186,9 @@ fn move_car(
 
     velocity.0 += GRAVITY * timer.delta_secs();
 
-    car_pos.translation.y += timer.delta_secs() * velocity.0;
+    car_pos.translation += (timer.delta_secs() * velocity.0).extend(0.);
     if car_pos.translation.y < Earth::GROUND_Y + Car::HEIGHT / 2. {
-        velocity.0 = 0.;
+        velocity.0 = Vec2::ZERO;
         car_pos.translation.y = Earth::GROUND_Y + Car::HEIGHT / 2.0;
     }
 }
@@ -276,7 +301,7 @@ fn setup_menu(mut commands: Commands) {
                 ))
                 .with_children(|parent| {
                     parent.spawn((
-                        Text::new("Exit"),
+                        Text::new("Quit"),
                         TextFont {
                             font_size: ExitButton::TEXT_SIZE,
                             ..default()
